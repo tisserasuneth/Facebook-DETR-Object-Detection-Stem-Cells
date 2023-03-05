@@ -32,12 +32,9 @@ quality = []
 def box_cxcywh_to_xyxy(x):
     x_c, y_c, w, h = x.unbind(1)
     #extracting x and y
-    # print('x ----------------------')
-    # print(x_c.cpu().detach().numpy())
-    # print('y ----------------------')
-    # print(y_c.cpu().detach().numpy())
-    xList.append(x_c.cpu().detach().numpy())
-    yList.append(y_c.cpu().detach().numpy())
+
+    xList.append((x_c.cpu().detach().numpy()))
+    yList.append((y_c.cpu().detach().numpy()))
 
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
@@ -47,7 +44,7 @@ def rescale_bboxes(out_bbox, size):
     img_w, img_h = size
     b = box_cxcywh_to_xyxy(out_bbox)
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
-    return b
+    print(b)
 
 def plot_results(pil_img, prob, boxes):
     plt.figure(figsize=(16,10))
@@ -78,13 +75,9 @@ def visualize_predictions(image, outputs, threshold=0.9):
   # plot results
   plot_results(image, probas[keep], bboxes_scaled)
 
-  #We can use the image_id in target to know which image it is
-
-
-
 #Each file being tested on needs to be in a json list
 
-pixel_values, target = val_dataset[13]
+pixel_values, target = val_dataset[15]
 
 pixel_values = pixel_values.unsqueeze(0).to(device)
 #print(pixel_values.shape)
@@ -98,9 +91,15 @@ image = Image.open(os.path.join(f'{img_folder}/val/images', image['file_name']))
 # #WORKS ON 1 PICTURE. MODIFY TO VIEW OTHER PICTURES
 visualize_predictions(image, outputs)
 
+img_w, img_h = image.size
+print(img_w)
+print(img_h)
 for i in range(0,len(xList)):
-#     print(str(xList[i]) + ' ' + str(yList[i]) + ' ' + str(quality[i]))
-
-    print(xList[i])
-    print(yList[i])
+#print(str(xList[i]) + ' ' + str(yList[i]) + ' ' + str(quality[i]))
+    
+    print(xList[i]+0.5*img_w)
+    print(yList[i]+0.5*img_h)
     print(quality[i])
+
+    #multiply by height and width
+    #frame number from image name
