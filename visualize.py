@@ -10,6 +10,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageDraw
+import pandas
 
 
 from classes import *
@@ -44,7 +45,7 @@ def rescale_bboxes(out_bbox, size):
     img_w, img_h = size
     b = box_cxcywh_to_xyxy(out_bbox)
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
-    print(b)
+    return b
 
 def plot_results(pil_img, prob, boxes):
     plt.figure(figsize=(16,10))
@@ -77,10 +78,9 @@ def visualize_predictions(image, outputs, threshold=0.9):
 
 #Each file being tested on needs to be in a json list
 
-pixel_values, target = val_dataset[15]
+pixel_values, target = val_dataset[12]
 
 pixel_values = pixel_values.unsqueeze(0).to(device)
-#print(pixel_values.shape)
 
 # # forward pass to get class logits and bounding boxes
 outputs = model(pixel_values=pixel_values, pixel_mask=None)
@@ -92,14 +92,20 @@ image = Image.open(os.path.join(f'{img_folder}/val/images', image['file_name']))
 visualize_predictions(image, outputs)
 
 img_w, img_h = image.size
-print(img_w)
-print(img_h)
-for i in range(0,len(xList)):
-#print(str(xList[i]) + ' ' + str(yList[i]) + ' ' + str(quality[i]))
-    
-    print(xList[i]+0.5*img_w)
-    print(yList[i]+0.5*img_h)
-    print(quality[i])
 
+for i in range(0,len(xList[0])):
+    #need z
+    print(xList[0][i]+img_w*0.5,yList[0][i]+img_h*0.5,quality[0][i])
     #multiply by height and width
     #frame number from image name
+    #x,y,z,q
+
+
+
+    # Introduction
+    # Methods
+        #Running on 2080
+    # results
+    # Discussion
+    #20 pages
+    #talk about dbscan
