@@ -10,12 +10,37 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageDraw
-import pandas
+import pandas as pd
+import json
 
 
 from classes import *
 
 model = Detr(lr=1e-4, lr_backbone=1e-5, weight_decay=1e-4)
+path = f'{img_folder}/test/images'
+test_set = CocoDetection(img_folder=path, feature_extractor=feature_extractor, mode='test')
+
+bigDict = {}
+bigDict['x'] = []
+bigDict['y'] = []
+bigDict['z'] = []
+bigDict['q'] = []
+
+files = os.listdir("test/images")
+files = sorted(files)
+
+idList = {"images":[]}
+idCount = 0
+for f in files:
+    if(f[-4:]=='json'):
+        files.remove(f)
+    temptDict = {"file_name":f,"id":idCount}
+    idList["images"].append(temptDict)
+    idCount+=1
+
+with open(f'{img_folder}/test/images/custom_test.json', 'w') as f:
+    json.dump(idList, f)
+
 
 model.load_state_dict(torch.load('model.pth'))
 
@@ -25,17 +50,10 @@ model.to(device)
 COLORS = [[0.000, 0.447, 0.741], [0.850, 0.325, 0.098], [0.929, 0.694, 0.125],
           [0.494, 0.184, 0.556], [0.466, 0.674, 0.188], [0.301, 0.745, 0.933]]
 
-xList = []
-yList = []
-quality = []
-
 # for output bounding box post-processing
 def box_cxcywh_to_xyxy(x):
     x_c, y_c, w, h = x.unbind(1)
     #extracting x and y
-
-    xList.append((x_c.cpu().detach().numpy()))
-    yList.append((y_c.cpu().detach().numpy()))
 
     b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
          (x_c + 0.5 * w), (y_c + 0.5 * h)]
@@ -47,60 +65,68 @@ def rescale_bboxes(out_bbox, size):
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
     return b
 
-def plot_results(pil_img, prob, boxes):
-    plt.figure(figsize=(16,10))
-    plt.imshow(pil_img)
-    ax = plt.gca()
-    colors = COLORS * 100
-    for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), colors):
-        ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
-                                   fill=False, color=c, linewidth=3))
-        cl = p.argmax()
-        text = "cell"
-        ax.text(xmin, ymin, text, fontsize=15,
-                bbox=dict(facecolor='blue', alpha=0.5))
-    plt.axis('off')
-    plt.savefig("cell.png")
+def predict(i):
 
-def visualize_predictions(image, outputs, threshold=0.9):
-  # keep only predictions with confidence >= threshold
-  probas = outputs.logits.softmax(-1)[0, :, :-1]
-  keep = probas.max(-1).values > threshold
+    xy = []
+    z = []
+    quality = []
 
-  confidence = probas[keep].max(-1).values
-#   print('confidence ----------------------')
-#   print(confidence.cpu().detach().numpy())
-  quality.append(confidence.cpu().detach().numpy())
-  # convert predicted boxes from [0; 1] to image scales
-  bboxes_scaled = rescale_bboxes(outputs.pred_boxes[0, keep].cpu(), image.size)
-  # plot results
-  plot_results(image, probas[keep], bboxes_scaled)
+    def plot_results(pil_img, prob, boxes):
+        draw = ImageDraw.Draw(pil_img)
+        plt.figure(figsize=(16,10))
+        plt.imshow(pil_img)
+        ax = plt.gca()
+        colors = COLORS * 100
+        for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), colors):
+            ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
+                                    fill=False, color=c, linewidth=3))
+            cl = p.argmax()
+            text = "cell"
+            xy.append((('{:.4f}'.format((xmax-xmin)/2  + xmin)), '{:.4f}'.format( ( (ymax-ymin)/2 + ymin)))) 
 
-#Each file being tested on needs to be in a json list
+            draw.text((xmin, ymin), text, fill='red')
+            ax.text(xmin, ymin, text, fontsize=15,
+                    bbox=dict(facecolor='blue', alpha=0.5))
+        # count.append(len(prob))
+        plt.axis('off')
+        plt.savefig(f"test/pred_000{image.filename[-7:-4]}.png")
 
-pixel_values, target = val_dataset[12]
+    def visualize_predictions(image, outputs, threshold=0.9):
+        # keep only predictions with confidence >= threshold
+        probas = outputs.logits.softmax(-1)[0, :, :-1]
+        keep = probas.max(-1).values > threshold
+        confidence = probas[keep].max(-1).values
+        quality.append(confidence.cpu().detach().numpy())
+        # convert predicted boxes from [0; 1] to image scales
+        bboxes_scaled = rescale_bboxes(outputs.pred_boxes[0, keep].cpu(), image.size)
+        # plot results
+        plot_results(image, probas[keep], bboxes_scaled)
 
-pixel_values = pixel_values.unsqueeze(0).to(device)
+    pixel_values, target = test_set[i]
 
-# # forward pass to get class logits and bounding boxes
-outputs = model(pixel_values=pixel_values, pixel_mask=None)
+    pixel_values = pixel_values.unsqueeze(0).to(device)
 
-image_id = target['image_id'].item()
-image = val_dataset.coco.loadImgs(image_id)[0]
-image = Image.open(os.path.join(f'{img_folder}/val/images', image['file_name']))
-# #WORKS ON 1 PICTURE. MODIFY TO VIEW OTHER PICTURES
-visualize_predictions(image, outputs)
+    # # forward pass to get class logits and bounding boxes
+    outputs = model(pixel_values=pixel_values, pixel_mask=None)
 
-img_w, img_h = image.size
+    image_id = target['image_id'].item()
 
-for i in range(0,len(xList[0])):
-    #need z
-    print(xList[0][i]+img_w*0.5,yList[0][i]+img_h*0.5,quality[0][i])
-    #multiply by height and width
-    #frame number from image name
-    #x,y,z,q
+    image = test_set.coco.loadImgs(image_id)[0]
+    image = Image.open(os.path.join(f'{img_folder}/test/images', image['file_name']))
 
+    # #WORKS ON 1 PICTURE. MODIFY TO VIEW OTHER PICTURES
+    visualize_predictions(image, outputs)
 
+    img_w, img_h = image.size
+
+    for f in range(0,len(xy)):
+        bigDict['x'].append(float(xy[f][0]))
+        bigDict['y'].append(float(xy[f][1]))
+        bigDict['z'].append(int(image.filename[-7:-4]))
+        bigDict['q'].append(float(quality[0][f]))
+
+for i in range(0,len(files)-1):
+    predict(i)
 
     # Introduction
     # Methods
@@ -109,3 +135,5 @@ for i in range(0,len(xList[0])):
     # Discussion
     #20 pages
     #talk about dbscan
+df = pd.DataFrame(bigDict)
+print(df.to_string(index=False))
