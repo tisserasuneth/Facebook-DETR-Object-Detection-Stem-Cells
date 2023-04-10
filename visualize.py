@@ -120,10 +120,7 @@ def predict(i):
     img_w, img_h = image.size
 
     for f in range(0,len(xy)):
-        bigDict['x'].append(float(xy[f][0]))
-        bigDict['y'].append(float(xy[f][1]))
-        bigDict['z'].append(int(image.filename[-7:-4]))
-        bigDict['q'].append(float(quality[0][f]))
+        bigDict['x'].append(float(xy[f][0])); bigDict['y'].append(float(xy[f][1])); bigDict['z'].append(int(image.filename[-7:-4])); bigDict['q'].append(float(quality[0][f]))
 
 for i in range(0,len(files)-1):
     predict(i)
@@ -137,3 +134,4 @@ for i in range(0,len(files)-1):
     #talk about dbscan
 df = pd.DataFrame(bigDict)
 print(df.to_string(index=False))
+df.to_csv('test.txt', index=None, sep=' ')
