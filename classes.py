@@ -1,5 +1,6 @@
 import torchvision
 import os
+import json
 from transformers import DetrFeatureExtractor
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
@@ -12,8 +13,20 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 class CocoDetection(torchvision.datasets.CocoDetection):
-    def __init__(self, img_folder, feature_extractor, train=True):
-        ann_file = os.path.join(img_folder, "custom_train.json" if train else "custom_val.json")
+    def __init__(self, img_folder, feature_extractor, mode="train"):
+        if(mode=="train"):
+          ann_file = os.path.join(img_folder, "custom_train.json")
+        elif(mode=="val"):
+           ann_file = os.path.join(img_folder, "custom_val.json")
+        elif(mode=="test"):
+            if(os.path.exists(os.path.join(img_folder, "custom_test.json"))==False):
+              ann_file = os.path.join(img_folder, "custom_test.json")
+              with open(ann_file, 'w') as f:
+                json.dump({}, f)
+            ann_file = os.path.join(img_folder, "custom_test.json")
+        else:
+          print('Check mode value')
+        # ann_file = os.path.join(img_folder, "custom_train.json" if mode == "train" else "custom_val.json" if mode == "val" else None)
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self.feature_extractor = feature_extractor
 
@@ -37,8 +50,8 @@ feature_extractor = DetrFeatureExtractor.from_pretrained("facebook/detr-resnet-5
 
 
 #training and validation datasets are created
-train_dataset = CocoDetection(img_folder=f'{img_folder}/train/images', feature_extractor=feature_extractor)
-val_dataset = CocoDetection(img_folder=f'{img_folder}/val/images', feature_extractor=feature_extractor, train=False)
+train_dataset = CocoDetection(img_folder=f'{img_folder}/train/images', feature_extractor=feature_extractor, mode="train")
+val_dataset = CocoDetection(img_folder=f'{img_folder}/val/images', feature_extractor=feature_extractor, mode="val")
 
 
 cats = train_dataset.coco.cats
@@ -120,3 +133,4 @@ class Detr(pl.LightningModule):
 
      def val_dataloader(self):
         return val_dataloader
+
