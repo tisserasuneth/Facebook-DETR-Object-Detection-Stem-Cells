@@ -6,7 +6,6 @@ from torch.utils.data import DataLoader
 import pytorch_lightning as pl
 from transformers import DetrConfig, DetrForObjectDetection
 from pytorch_lightning import Trainer
-from tqdm.notebook import tqdm
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
