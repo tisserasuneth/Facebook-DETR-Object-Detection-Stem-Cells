@@ -11,12 +11,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageDraw
 import pandas as pd
+import shutil
 import json
-
-
 from classes import *
+import time
 
-model = Detr(lr=1e-4, lr_backbone=1e-5, weight_decay=1e-4)
+
+model = Detr(lr=1e-5, lr_backbone=1e-5, weight_decay=1e-4)
 path = f'{img_folder}/test/images'
 test_set = CocoDetection(img_folder=path, feature_extractor=feature_extractor, mode='test')
 
@@ -25,6 +26,9 @@ bigDict['x'] = []
 bigDict['y'] = []
 bigDict['z'] = []
 bigDict['q'] = []
+
+if(os.path.exists(os.path.join(img_folder, "test/images/custom_test.json"))):
+    os.remove(os.path.join(img_folder, "test/images/custom_test.json"))
 
 files = os.listdir("test/images")
 files = sorted(files)
@@ -44,11 +48,12 @@ with open(f'{img_folder}/test/images/custom_test.json', 'w') as f:
 
 model.load_state_dict(torch.load('model.pth'))
 
-device = torch.device("cuda")
+device = torch.device("cpu")
 model.to(device)
 
 COLORS = [[0.000, 0.447, 0.741], [0.850, 0.325, 0.098], [0.929, 0.694, 0.125],
           [0.494, 0.184, 0.556], [0.466, 0.674, 0.188], [0.301, 0.745, 0.933]]
+
 
 # for output bounding box post-processing
 def box_cxcywh_to_xyxy(x):
@@ -68,7 +73,6 @@ def rescale_bboxes(out_bbox, size):
 def predict(i):
 
     xy = []
-    z = []
     quality = []
 
     def plot_results(pil_img, prob, boxes):
@@ -79,17 +83,18 @@ def predict(i):
         colors = COLORS * 100
         for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), colors):
             ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
-                                    fill=False, color=c, linewidth=3))
+                                    fill=False, color=c, linewidth=1))
             cl = p.argmax()
             text = "cell"
             xy.append((('{:.4f}'.format((xmax-xmin)/2  + xmin)), '{:.4f}'.format( ( (ymax-ymin)/2 + ymin)))) 
 
-            draw.text((xmin, ymin), text, fill='red')
-            ax.text(xmin, ymin, text, fontsize=15,
-                    bbox=dict(facecolor='blue', alpha=0.5))
+            # draw.text((xmin, ymin), text, fill='red')
+            # ax.text(xmin, ymin, text, fontsize=15,
+            #         bbox=dict(facecolor='blue', alpha=0.5))
         # count.append(len(prob))
+        print("FOUND {} BOXES".format(len(prob)))
         plt.axis('off')
-        plt.savefig(f"test/pred_000{image.filename[-7:-4]}.png")
+        plt.savefig(f"test/predictions/pred_000{image.filename[-7:-4]}.png")
 
     def visualize_predictions(image, outputs, threshold=0.9):
         # keep only predictions with confidence >= threshold
@@ -114,7 +119,6 @@ def predict(i):
     image = test_set.coco.loadImgs(image_id)[0]
     image = Image.open(os.path.join(f'{img_folder}/test/images', image['file_name']))
 
-    # #WORKS ON 1 PICTURE. MODIFY TO VIEW OTHER PICTURES
     visualize_predictions(image, outputs)
 
     img_w, img_h = image.size
@@ -122,16 +126,12 @@ def predict(i):
     for f in range(0,len(xy)):
         bigDict['x'].append(float(xy[f][0])); bigDict['y'].append(float(xy[f][1])); bigDict['z'].append(int(image.filename[-7:-4])); bigDict['q'].append(float(quality[0][f]))
 
-for i in range(0,len(files)-1):
+start_time = time.time()
+for i in range(0,len(files)):
     predict(i)
+end_time = time.time()
+elapsed_time = end_time - start_time
+print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
-    # Introduction
-    # Methods
-        #Running on 2080
-    # results
-    # Discussion
-    #20 pages
-    #talk about dbscan
 df = pd.DataFrame(bigDict)
-print(df.to_string(index=False))
 df.to_csv('test.txt', index=None, sep=' ')

@@ -25,7 +25,6 @@ class CocoDetection(torchvision.datasets.CocoDetection):
             ann_file = os.path.join(img_folder, "custom_test.json")
         else:
           print('Check mode value')
-        # ann_file = os.path.join(img_folder, "custom_train.json" if mode == "train" else "custom_val.json" if mode == "val" else None)
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self.feature_extractor = feature_extractor
 
@@ -45,7 +44,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 #defining the folder for images and annotations
 img_folder = "/home/tisseras/DETR"
 
-feature_extractor = DetrFeatureExtractor.from_pretrained("facebook/detr-resnet-50")
+feature_extractor = DetrFeatureExtractor.from_pretrained("facebook/detr-resnet-101-dc5")
 
 
 #training and validation datasets are created
@@ -71,7 +70,7 @@ class Detr(pl.LightningModule):
      def __init__(self, lr, lr_backbone, weight_decay):
          super().__init__()
          # replace COCO classification head with custom head
-         self.model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", 
+         self.model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-101-dc5", 
                                                              num_labels=len(id2label),
                                                              ignore_mismatched_sizes=True)
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896

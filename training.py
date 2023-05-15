@@ -11,11 +11,12 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image, ImageDraw
-
-
+import time
 #CocoDetection creates a dataset with with the images and annotations. 
 #The feature extractor resizes and normalizes the images and 
 #turns the annotations from the COCO format to a format that DETR expects
+
+start_time = time.time()
 
 class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self, img_folder, feature_extractor, train=True):
@@ -39,8 +40,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 #defining the folder for images and annotations
 img_folder = "/home/tisseras/DETR"
 
-feature_extractor = DetrFeatureExtractor.from_pretrained("facebook/detr-resnet-50")
-
+feature_extractor = DetrFeatureExtractor.from_pretrained("facebook/detr-resnet-101-dc5")
 
 #training and validation datasets are created
 train_dataset = CocoDetection(img_folder=f'{img_folder}/train/images', feature_extractor=feature_extractor)
@@ -66,15 +66,15 @@ def collate_fn(batch):
   return batch
 
 
-train_dataloader = DataLoader(train_dataset, collate_fn=collate_fn, batch_size=2, shuffle=True)
-val_dataloader = DataLoader(val_dataset, collate_fn=collate_fn, batch_size=2)
+train_dataloader = DataLoader(train_dataset, collate_fn=collate_fn, batch_size=1, shuffle=True)
+val_dataloader = DataLoader(val_dataset, collate_fn=collate_fn, batch_size=1)
 batch = next(iter(train_dataloader))
 
 class Detr(pl.LightningModule):
      def __init__(self, lr, lr_backbone, weight_decay):
          super().__init__()
          # replace COCO classification head with custom head
-         self.model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50", 
+         self.model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-101-dc5", 
                                                              num_labels=len(id2label),
                                                              ignore_mismatched_sizes=True)
          # see https://github.com/PyTorchLightning/pytorch-lightning/pull/1896
@@ -100,14 +100,12 @@ class Detr(pl.LightningModule):
        return loss, loss_dict
 
      def training_step(self, batch, batch_idx):
-
         loss, loss_dict = self.common_step(batch, batch_idx)     
         # logs metrics for each training_step,
         # and the average across the epoch
         self.log("training_loss", loss)
         for k,v in loss_dict.items():
           self.log("train_" + k, v.item())
-
         return loss
 
      def validation_step(self, batch, batch_idx):
@@ -115,7 +113,6 @@ class Detr(pl.LightningModule):
         self.log("validation_loss", loss)
         for k,v in loss_dict.items():
           self.log("validation_" + k, v.item())
-
         return loss
 
      def configure_optimizers(self):
@@ -128,7 +125,6 @@ class Detr(pl.LightningModule):
         ]
         optimizer = torch.optim.AdamW(param_dicts, lr=self.lr,
                                   weight_decay=self.weight_decay)
-        
         return optimizer
 
      def train_dataloader(self):
@@ -138,12 +134,17 @@ class Detr(pl.LightningModule):
         return val_dataloader
     
 model = Detr(lr=1e-5, lr_backbone=1e-5, weight_decay=1e-4)
-#model = Detr(lr=1e-4, lr_backbone=1e-5, weight_decay=1e-4)
+# model = Detr(lr=1e-4, lr_backbone=1e-5, weight_decay=1e-4)
 
-outputs = model(pixel_values=batch['pixel_values'], pixel_mask=batch['pixel_mask'])
+# outputs = model(pixel_values=batch['pixel_values'], pixel_mask=batch['pixel_mask'])
 
 trainer = Trainer(gpus=1, max_epochs=100, max_steps=30000 , gradient_clip_val=0.1)
-#trainer = Trainer(gpus=1, max_steps=700 , gradient_clip_val=0.1)
+# trainer = Trainer(gpus=1, max_steps=700 , gradient_clip_val=0.1)
 trainer.fit(model)
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+
+print(f"Elapsed time: {elapsed_time:.4f} seconds")
 
 torch.save(model.state_dict(),"model.pth")
